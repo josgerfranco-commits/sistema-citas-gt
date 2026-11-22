@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema de Citas en Línea</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Barra Superior -->
+  <header id="header-bar" class="bg-teal-700 text-white shadow-md">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div>
+        <h1 id="nombre-clinica" class="text-xl font-bold tracking-tight">Cargando clínica...</h1>
+        <p class="text-xs opacity-90">Agendamiento de citas en línea 24/7</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="cambiarVista('paciente')" id="btn-vista-paciente" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition">
+          Agendar Cita
+        </button>
+        <button onclick="abrirModalAdmin()" id="btn-vista-admin" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-900/40 hover:bg-slate-900/60 transition">
+          Panel Recepción
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="max-w-5xl mx-auto px-4 py-8 flex-1 w-full">
+
+    <!-- VISTA 1: PACIENTE -->
+    <section id="vista-paciente" class="grid md:grid-cols-3 gap-6">
+      <!-- Formulario de Reserva -->
+      <div class="md:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <h2 class="text-lg font-bold text-slate-800 mb-1">Reserva tu cita en menos de 1 minuto</h2>
+        <p class="text-sm text-slate-500 mb-5">Selecciona especialidad, fecha y horario disponible en tiempo real.</p>
+
+        <form id="form-cita" class="space-y-4">
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Especialidad / Servicio</label>
+              <select id="select-servicio" required onchange="cargarHorariosDisponibles()" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-600 outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Fecha de la Cita</label>
+              <input type="date" id="input-fecha" required onchange="cargarHorariosDisponibles()" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
+            </div>
+          </div>
+
+          <!-- Grid de Horarios Dinámicos -->
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-2">Horarios Disponibles</label>
+            <div id="grid-horarios" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+            <input type="hidden" id="input-hora" required />
+          </div>
+
+          <hr class="border-slate-100 my-2" />
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Nombre Completo del Paciente</label>
+              <input type="text" id="input-nombre" required placeholder="Ej. María Fernanda López" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Teléfono WhatsApp (8 dígitos)</label>
+              <input type="tel" id="input-telefono" required pattern="[0-9]{8}" placeholder="Ej. 55123456" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Motivo de consulta (Opcional)</label>
+            <input type="text" id="input-notas" placeholder="Ej. Primera evaluación o seguimiento" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-600 outline-none" />
+          </div>
+
+          <button type="submit" id="btn-submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl shadow-sm transition">
+            Confirmar Cita Ahora
+          </button>
+        </form>
+      </div>
+
+      <!-- Tarjeta Lateral de Resumen / Confirmación -->
+      <div class="space-y-4">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h3 class="font-bold text-slate-800 text-sm mb-2">¿Cómo funciona?</h3>
+          <ul class="text-xs text-slate-600 space-y-2">
+            <li>✅ Disponibilidad actualizada al segundo.</li>
+            <li>✅ Sin llamadas ni tiempos de espera.</li>
+            <li>✅ Comprobante inmediato directo a WhatsApp.</li>
+          </ul>
+        </div>
+
+        <!-- Caja de Éxito al Agendar -->
+        <div id="caja-exito" class="hidden bg-emerald-50 border border-emerald-300 p-5 rounded-2xl">
+          <h3 class="font-bold text-emerald-900 text-base mb-1">🎉 ¡Cita Registrada!</h3>
+          <p id="detalle-exito" class="text-xs text-emerald-800 mb-4"></p>
+          <a id="link-wa-comprobante" href="#" target="_blank" class="block text-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition">
+            Enviar Comprobante por WhatsApp
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA 2: PANEL ADMINISTRATIVO (RECEPCIÓN / MÉDICO) -->
+    <section id="vista-admin" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">Agenda y Control de Citas</h2>
+          <p class="text-xs text-slate-500">Gestiona pacientes confirmados, recordatorios por WhatsApp y estados.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="date" id="filtro-fecha-admin" onchange="cargarCitasAdmin()" class="border border-slate-300 rounded-xl px-3 py-2 text-sm" />
+          <button onclick="cargarCitasAdmin(true)" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 rounded-xl text-xs font-semibold">
+            Ver Todas
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs Rápidos -->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <p class="text-xs text-slate-500">Total Citas Listadas</p>
+          <p id="kpi-total" class="text-2xl font-bold text-slate-800">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <p class="text-xs text-slate-500">Confirmadas</p>
+          <p id="kpi-confirmadas" class="text-2xl font-bold text-teal-700">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <p class="text-xs text-slate-500">Ingreso Estimado</p>
+          <p id="kpi-ingresos" class="text-2xl font-bold text-emerald-700">Q0</p>
+        </div>
+      </div>
+
+      <!-- Tabla de Citas -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-100 text-slate-600 text-xs uppercase">
+              <th class="py-3 px-4">Fecha y Hora</th>
+              <th class="py-3 px-4">Paciente</th>
+              <th class="py-3 px-4">Servicio</th>
+              <th class="py-3 px-4">Estado</th>
+              <th class="py-3 px-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-citas-body" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ==========================================
+    // CONFIGURACIÓN DE SUPABASE (TUS CREDENCIALES)
+    // ==========================================
+    const SUPABASE_URL = 'https://ecpcvpauuxljuvfuoma.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_G7Gv00mYSSYZsA6fHSMGSQ_f6SHCpD5';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Horarios base de la clínica
+    const HORARIOS_BASE = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
+
+    let clinicaActual = null;
+    let serviciosLista = [];
+
+    // Inicializar aplicación leyendo ?clinica=medicagt de la URL
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('clinica') || 'medicagt';
+
+      const { data: clinica, error } = await db.from('clinicas').select('*').eq('slug', slug).single();
+      if (error || !clinica) {
+        document.getElementById('nombre-clinica').textContent = 'Clínica no encontrada';
+        return;
+      }
+
+      clinicaActual = clinica;
+      document.getElementById('nombre-clinica').textContent = clinica.nombre;
+      document.getElementById('header-bar').style.backgroundColor = clinica.color_primario;
+
+      // Fecha por defecto: hoy
+      const hoy = new Date().toISOString().split('T')[0];
+      document.getElementById('input-fecha').value = hoy;
+      document.getElementById('input-fecha').min = hoy;
+      document.getElementById('filtro-fecha-admin').value = hoy;
+
+      // Cargar servicios
+      const { data: servicios } = await db.from('servicios').select('*').eq('clinica_id', clinica.id);
+      serviciosLista = servicios || [];
+      const select = document.getElementById('select-servicio');
+      select.innerHTML = serviciosLista.map(s => `<option value="${s.id}">${s.nombre} (Q${s.precio_q})</option>`).join('');
+
+      await cargarHorariosDisponibles();
+    }
+
+    // Consultar horas ocupadas reales en Supabase
+    async function cargarHorariosDisponibles() {
+      const servicioId = document.getElementById('select-servicio').value;
+      const fecha = document.getElementById('input-fecha').value;
+      const grid = document.getElementById('grid-horarios');
+      document.getElementById('input-hora').value = '';
+
+      if (!servicioId || !fecha) return;
+
+      const { data: citasOcupadas } = await db
+        .from('citas')
+        .select('hora')
+        .eq('clinica_id', clinicaActual.id)
+        .eq('servicio_id', servicioId)
+        .eq('fecha', fecha)
+        .neq('estado', 'Cancelada');
+
+      const horasBloqueadas = (citasOcupadas || []).map(c => c.hora);
+
+      grid.innerHTML = HORARIOS_BASE.map(hora => {
+        const ocupado = horasBloqueadas.includes(hora);
+        if (ocupado) {
+          return `<button type="button" disabled class="py-2 rounded-lg text-xs font-semibold bg-rose-50 text-rose-400 border border-rose-200 line-through cursor-not-allowed">${hora} Ocupado</button>`;
+        }
+        return `<button type="button" onclick="seleccionarHora(this, '${hora}')" class="btn-hora py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-teal-100 text-slate-700 border border-slate-200 transition">${hora}</button>`;
+      }).join('');
+    }
+
+    function seleccionarHora(btn, hora) {
+      document.querySelectorAll('.btn-hora').forEach(b => {
+        b.classList.remove('bg-teal-700', 'text-white', 'border-teal-700');
+        b.classList.add('bg-slate-100', 'text-slate-700');
+      });
+      btn.classList.remove('bg-slate-100', 'text-slate-700');
+      btn.classList.add('bg-teal-700', 'text-white', 'border-teal-700');
+      document.getElementById('input-hora').value = hora;
+    }
+
+    // Guardar cita real en PostgreSQL
+    document.getElementById('form-cita').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const hora = document.getElementById('input-hora').value;
+      if (!hora) {
+        alert('Por favor selecciona un horario disponible.');
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.textContent = 'Guardando cita...';
+
+      const servicioId = document.getElementById('select-servicio').value;
+      const servicioObj = serviciosLista.find(s => s.id === servicioId);
+      const fecha = document.getElementById('input-fecha').value;
+      const nombre = document.getElementById('input-nombre').value.trim();
+      const telefono = document.getElementById('input-telefono').value.trim();
+      const notas = document.getElementById('input-notas').value.trim();
+
+      const { error } = await db.from('citas').insert([{
+        clinica_id: clinicaActual.id,
+        servicio_id: servicioId,
+        paciente_nombre: nombre,
+        paciente_telefono: telefono,
+        fecha,
+        hora,
+        notas
+      }]);
+
+      btn.disabled = false;
+      btn.textContent = 'Confirmar Cita Ahora';
+
+      if (error) {
+        alert('Ese horario acaba de ser reservado. Por favor elige otro.');
+        await cargarHorariosDisponibles();
+        return;
+      }
+
+      // Mostrar comprobante y enlace directo a WhatsApp
+      const textoWa = encodeURIComponent(
+        `Hola *${clinicaActual.nombre}*, acabo de agendar mi cita en línea:\n\n` +
+        `👤 *Paciente:* ${nombre}\n` +
+        `🩺 *Servicio:* ${servicioObj.nombre}\n` +
+        `📅 *Fecha:* ${fecha}\n` +
+        `⏰ *Hora:* ${hora}\n` +
+        `📱 *Teléfono:* ${telefono}`
+      );
+
+      document.getElementById('detalle-exito').textContent = `${nombre} — ${servicioObj.nombre} el ${fecha} a las ${hora}.`;
+      document.getElementById('link-wa-comprobante').href = `https://wa.me/${clinicaActual.whatsapp_recepcion}?text=${textoWa}`;
+      document.getElementById('caja-exito').classList.remove('hidden');
+
+      e.target.reset();
+      document.getElementById('input-fecha').value = fecha;
+      await cargarHorariosDisponibles();
+    });
+
+    // Cambiar entre vista Paciente y Panel Recepción
+    function cambiarVista(vista) {
+      document.getElementById('vista-paciente').classList.toggle('hidden', vista !== 'paciente');
+      document.getElementById('vista-admin').classList.toggle('hidden', vista !== 'admin');
+      if (vista === 'admin') cargarCitasAdmin();
+    }
+
+    function abrirModalAdmin() {
+      const pin = prompt(`Ingresa el PIN administrativo de ${clinicaActual.nombre} (Prueba: ${clinicaActual.pin_admin}):`);
+      if (pin === clinicaActual.pin_admin) {
+        cambiarVista('admin');
+      } else if (pin !== null) {
+        alert('PIN incorrecto.');
+      }
+    }
+
+    // Cargar citas reales en el panel administrativo
+    async function cargarCitasAdmin(verTodas = false) {
+      const fechaFiltro = document.getElementById('filtro-fecha-admin').value;
+      let query = db
+        .from('citas')
+        .select('*, servicios(nombre, precio_q)')
+        .eq('clinica_id', clinicaActual.id)
+        .order('fecha', { ascending: true })
+        .order('hora', { ascending: true });
+
+      if (!verTodas && fechaFiltro) {
+        query = query.eq('fecha', fechaFiltro);
+      }
+
+      const { data: citas } = await query;
+      const lista = citas || [];
+
+      document.getElementById('kpi-total').textContent = lista.length;
+      const activas = lista.filter(c => c.estado !== 'Cancelada');
+      document.getElementById('kpi-confirmadas').textContent = activas.length;
+      const totalQ = activas.reduce((acc, c) => acc + Number(c.servicios?.precio_q || 0), 0);
+      document.getElementById('kpi-ingresos').textContent = `Q${totalQ.toFixed(2)}`;
+
+      const tbody = document.getElementById('tabla-citas-body');
+      if (lista.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No hay citas registradas para esta fecha.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = lista.map(c => {
+        const msgRecordatorio = encodeURIComponent(
+          `Hola ${c.paciente_nombre}, le saludamos de *${clinicaActual.nombre}* para recordarle su cita de *${c.servicios?.nombre}* el día *${c.fecha}* a las *${c.hora}*. ¿Nos confirma su asistencia?`
+        );
+        const badgeColor = c.estado === 'Confirmada' ? 'bg-teal-100 text-teal-800' :
+                           c.estado === 'Atendida' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+
+        return `
+          <tr>
+            <td class="py-3 px-4 font-medium">${c.fecha} <span class="text-teal-700 font-bold">${c.hora}</span></td>
+            <td class="py-3 px-4">
+              <div class="font-semibold">${c.paciente_nombre}</div>
+              <div class="text-xs text-slate-500">Tel: ${c.paciente_telefono}</div>
+            </td>
+            <td class="py-3 px-4">${c.servicios?.nombre || 'Consulta'}</td>
+            <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeColor}">${c.estado}</span></td>
+            <td class="py-3 px-4 text-right space-x-1">
+              <a href="https://wa.me/502${c.paciente_telefono}?text=${msgRecordatorio}" target="_blank" class="inline-block bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-semibold">WhatsApp</a>
+              <button onclick="actualizarEstado('${c.id}', 'Atendida')" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-2.5 py-1 rounded-lg text-xs font-semibold">Atendida</button>
+              <button onclick="actualizarEstado('${c.id}', 'Cancelada')" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2.5 py-1 rounded-lg text-xs font-semibold">Cancelar</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function actualizarEstado(citaId, nuevoEstado) {
+      await db.from('citas').update({ estado: nuevoEstado }).eq('id', citaId);
+      await cargarCitasAdmin();
+      await cargarHorariosDisponibles();
+    }
+
+    init();
+  </script>
+</body>
+</html>
