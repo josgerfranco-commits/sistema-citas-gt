@@ -156,7 +156,7 @@
     // ==========================================
     // CONFIGURACIÓN DE SUPABASE (TUS CREDENCIALES)
     // ==========================================
-    const SUPABASE_URL = 'https://ecpcvpauuxljuvfgfuoma.supabase.co';
+    const SUPABASE_URL = 'https://ecpcvpauuxljuvgfuoma.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_G7Gv00mYSSYZsA6fHSMGSQ_f6SHCpD5';
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -203,7 +203,7 @@
       const grid = document.getElementById('grid-horarios');
       document.getElementById('input-hora').value = '';
 
-      if (!servicioId || !fecha) return;
+      if (!servicioId || !fecha || !clinicaActual) return;
 
       const { data: citasOcupadas } = await db
         .from('citas')
@@ -213,7 +213,7 @@
         .eq('fecha', fecha)
         .neq('estado', 'Cancelada');
 
-      const horasBloqueadas = (citasOcupadas || []).map(c => c.hora);
+      const horasBloqueadas = (citasOcupadas || []).map(c => String(c.hora).slice(0, 5));
 
       grid.innerHTML = HORARIOS_BASE.map(hora => {
         const ocupado = horasBloqueadas.includes(hora);
@@ -237,6 +237,8 @@
     // Guardar cita real en PostgreSQL
     document.getElementById('form-cita').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!clinicaActual) return;
+
       const hora = document.getElementById('input-hora').value;
       if (!hora) {
         alert('Por favor selecciona un horario disponible.');
@@ -300,6 +302,7 @@
     }
 
     function abrirModalAdmin() {
+      if (!clinicaActual) return;
       const pin = prompt(`Ingresa el PIN administrativo de ${clinicaActual.nombre} (Prueba: ${clinicaActual.pin_admin}):`);
       if (pin === clinicaActual.pin_admin) {
         cambiarVista('admin');
@@ -310,6 +313,7 @@
 
     // Cargar citas reales en el panel administrativo
     async function cargarCitasAdmin(verTodas = false) {
+      if (!clinicaActual) return;
       const fechaFiltro = document.getElementById('filtro-fecha-admin').value;
       let query = db
         .from('citas')
